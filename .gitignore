@@ -1,0 +1,42 @@
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+wechat_auto_reply_logs/
+wxauto_logs/
+*.txt  # 保留但排除重要文档
+
+# Archives
+*.zip
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Images (only if not needed as examples)
+image/*.jpg
+image/*.png
+
+# Build artifacts
+*.spec
+dist/
+build/
+*.exe
+*.msi
+*.deb
+*.rpm
