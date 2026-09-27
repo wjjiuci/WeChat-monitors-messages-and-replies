@@ -39,35 +39,101 @@
 
 ## 快速开始
 
+### 1. 克隆仓库并安装依赖
+
 ```bash
-# 1. 安装依赖（requirements.txt 已包含本地 wxauto-main 源码安装）
+git clone https://github.com/wjjiuci/WeChat-monitors-messages-and-replies.git
+cd WeChat-monitors-messages-and-replies
+
+# 安装依赖（requirements.txt 已包含本地 wxauto-main 源码安装）
 pip install -r requirements.txt
+```
 
-# 2. 配置
+### 2. 获取 API 密钥
+
+#### DeepSeek API Key（用于生成回复，**必须**）
+
+1. 打开 [DeepSeek 开放平台](https://platform.deepseek.com/)，点击「登录」，用手机号或邮箱注册账号
+2. 登录后直接进入 API Keys 管理页：[platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
+3. 点击「创建 API Key」，输入名称（如 `wechat-ai`），点击确认
+4. **立即复制**弹出的 Key（格式如 `sk-xxxxxxxx`），页面关闭后无法再次查看，只能重新创建
+5. 新注册账号通常有赠送余额，用完后在「充值」页面按需充值（API 调用按 tokens 计费，价格见[官方定价页](https://api-docs.deepseek.com/quick_start/pricing)）
+
+#### JEV API Key（用于智能决策，**可选但强烈建议**）
+
+JEV 是 TypeSafe AI 的 System One 决策模型（代码里调用的端点是 `https://api.typesafe.ai/v1/systemone`），目前为**邀请制**：
+
+1. 打开 TypeSafe 控制台 [console.typesafe.ai](https://console.typesafe.ai/)
+2. 注册账号并登录；如提示未开通，需加入 waitlist 等待邀请（也可参考官方文档 [docs.typesafe.ai](https://docs.typesafe.ai/introduction/quickstart)，或通过官方 Discord [discord.gg/typesafe](https://discord.gg/typesafe) 咨询开通进度）
+3. 账号开通后，在控制台创建 API Key 并复制保存
+4. 填入 `config.py` 的 `JEV_API_KEY`
+5. **没拿到 Key 也能用**：留空即可，程序会自动降级为本地 BERT 情感模型，只是决策精度和事件卡片解读会弱于 JEV
+
+### 3. 配置文件
+
+```bash
+# 复制配置模板
 copy config.example.py config.py
-# 编辑 config.py：填微信昵称、监听对象、API Keys、人设
 
-# 3. 抓取聊天记录（保持微信登录，先在微信里把历史消息往上翻加载出来）
+# 用编辑器打开 config.py，逐项填写：
+#   SELF_NICKNAME    → 本机登录微信的昵称（微信设置里能看到）
+#   TARGET_CONTACT   → 要自动回复的联系人备注名或群名（必须完全匹配）
+#   CHAT_NAME        → 要抓取聊天记录的联系人或群名
+#   DEEPSEEK_API_KEY → 上一步复制的 DeepSeek Key
+#   JEV_API_KEY      → 上一步复制的 JEV Key（可选，留空则降级本地模型）
+#   RELATIONSHIP     → 从恋人/暧昧对象/朋友/损友/长辈/家人/同事/客户中选一个
+#   RELATIONSHIP_CONTEXT → 可选，补充近况背景（如"最近在组队打游戏"），留空不启用
+#   PERSONA          → 你想让 AI 扮演的人设（说话风格、语气、口头禅等）
+```
+
+### 4. 抓取聊天记录（训练用）
+
+1. **保持微信 PC 客户端已登录**
+2. 在微信里找到目标聊天窗口，**手动往上翻**加载历史消息（翻得越多，训练效果越好，建议至少几百条）
+3. 运行抓取脚本：
+
+```bash
 python chat_history.py
+```
 
-# 4. 训练情感模型（用抓到的记录自动打标微调）
+4. 收集完成后，记录保存在**项目根目录**下的 `{CHAT_NAME}所有聊天记录.txt`（train.py 按此文件名读取，请勿改名）
+
+### 5. 训练情感模型
+
+```bash
 python train.py
+```
 
-# 5. 启动自动回复
+- 脚本自动读取上一步生成的 `{CHAT_NAME}所有聊天记录.txt`，用 SnowNLP 打情感标签
+- 然后基于 `bert-base-chinese` 微调一个三分类模型（正/中/负）
+- **首次运行会自动下载 BERT 预训练模型**（约 400MB，脚本已内置 hf-mirror 国内镜像加速，无需代理）
+- 训练好的模型保存在 `MODEL_DIR_NAME` 指定的目录，训练 checkpoints 在 `results/` 目录
+- 有 NVIDIA 显卡会快很多，纯 CPU 也能跑（无显卡用户如嫌 PyTorch 太大，可先装 CPU 版：`pip install torch --index-url https://download.pytorch.org/whl/cpu`）
+
+### 6. 启动自动回复
+
+```bash
 python WeChat_reply.py
 ```
 
+- 启动后会自动切换到 `TARGET_CONTACT` 的聊天窗口并开始监听
+- 收到新消息时，先走 JEV 决策（或本地 BERT 降级），再调用 DeepSeek 生成回复，最后通过 wxauto 自动发送
+- **运行期间请保持微信窗口可见**，不要最小化或遮挡，也尽量不要手动操作鼠标键盘（UI 自动化依赖窗口可见性；偶发断连程序会自动重新锁定窗口）
+- **按 `Ctrl + C` 可安全退出**
+
 ## 配置说明
 
-| 配置项 | 说明 |
-|---|---|
-| `SELF_NICKNAME` | 本机登录微信的昵称 |
-| `TARGET_CONTACT` / `CHAT_NAME` | 监听对象 / 抓取记录对象（联系人备注或群名） |
-| `MODEL_DIR_NAME` | 训练产物模型目录名 |
-| `PERSONA` | 人设提示词（说话风格、语气、方言习惯等） |
-| `RELATIONSHIP` | 与对方的关系，决定注入哪套沟通知识 |
-| `JEV_API_KEY` | JEV 决策模型 Key，留空则用本地 BERT |
-| `DEEPSEEK_API_KEY` | DeepSeek 回复模型 Key |
+| 配置项 | 说明 | 获取方式 |
+|---|---|---|
+| `SELF_NICKNAME` | 本机登录微信的昵称 | 微信客户端 → 左下角头像/设置 |
+| `TARGET_CONTACT` | 自动回复的监听对象（联系人备注或群名） | 必须与微信里的显示名称**完全一致** |
+| `CHAT_NAME` | 抓取聊天记录的对象（联系人备注或群名） | 可与 `TARGET_CONTACT` 相同或不同 |
+| `MODEL_DIR_NAME` | 训练产物模型目录名 | 保持默认即可，会自动创建 |
+| `PERSONA` | 人设提示词（说话风格、语气、方言习惯等） | 自由填写，越详细角色越鲜活 |
+| `RELATIONSHIP` | 与对方的关系 | 从 `恋人/暧昧对象/朋友/损友/长辈/家人/同事/客户` 中选一个，也可自定义 |
+| `RELATIONSHIP_CONTEXT` | 补充近况背景（可选） | 如"最近在组队打游戏"，留空不启用 |
+| `JEV_API_KEY` | JEV 决策模型 Key | [TypeSafe 控制台](https://console.typesafe.ai/)（邀请制）；**留空则降级本地 BERT** |
+| `DEEPSEEK_API_KEY` | DeepSeek 回复模型 Key | [DeepSeek 开放平台](https://platform.deepseek.com/api_keys) 注册后创建；**必须填写** |
 
 ## 项目结构
 
@@ -80,6 +146,14 @@ python WeChat_reply.py
 ├── requirements.txt
 └── .gitignore           # 已排除 config.py / 聊天记录 / 模型等隐私文件
 ```
+
+## 常见问题
+
+- **报错「缺少配置文件」**：还没把 `config.example.py` 复制为 `config.py`，见快速开始第 3 步
+- **微信 4.x 能用吗**：不能。4.x 进程是 Weixin.exe，需用微信 3.9.x（下载方式见 [wxauto-main/README.md](wxauto-main/README.md)），或自行迁移到 wxauto4
+- **抓取不到消息 / 监听没反应**：确认微信窗口可见且未最小化；确认 `TARGET_CONTACT` / `CHAT_NAME` 与微信里显示的名称（备注）完全一致
+- **train.py 提示聊天记录不存在**：确认先运行了 `chat_history.py`，且 `config.py` 里的 `CHAT_NAME` 与抓取时一致（文件名前缀必须匹配）
+- **DeepSeek 想用更强推理模型**：编辑 `WeChat_reply.py`，把 `deepseek-chat` 改为 `deepseek-reasoner`（注意推理模型延迟和费用更高）
 
 ## 免责声明
 
