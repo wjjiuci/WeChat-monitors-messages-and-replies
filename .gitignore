@@ -1,0 +1,16 @@
+# 私密数据与本地配置（绝不提交）
+config.py
+*所有聊天记录.txt
+*_finetuned_model/
+.env
+
+# 训练与运行产物
+results/
+wxauto_logs/
+__pycache__/
+*.spec
+
+# 无关目录
+yanwai/
+vader_lexicon/
+image/

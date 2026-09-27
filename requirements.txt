@@ -1,0 +1,8 @@
+# wxauto 使用仓库自带的 wxauto-main 源码（v39.2.1，适配微信 3.9.x）
+./wxauto-main
+requests
+torch
+transformers>=4.40
+datasets
+accelerate
+snownlp
